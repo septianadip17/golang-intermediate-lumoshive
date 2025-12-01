@@ -87,7 +87,7 @@ func handleRegister(scanner *bufio.Scanner) error {
 	newUser := User{
 		Email:       email,
 		PhoneNumber: phone,
-		Password:    password, // tidak hash
+		Password:    password,
 	}
 
 	users = append(users, newUser)
