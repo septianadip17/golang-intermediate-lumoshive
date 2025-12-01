@@ -8,30 +8,32 @@ import (
 	"os"
 	"regexp"
 	"strings"
-
-	"golang.org/x/crypto/bcrypt"
 )
 
 type User struct {
 	Email       string `json:"email"`
 	PhoneNumber string `json:"phone_number"`
-	Password    string `json:"password_hash"`
+	Password    string `json:"password"`
 }
 
 const dbFile = "users.json"
 
 func main() {
 	scanner := bufio.NewScanner(os.Stdin)
+
 	for {
 		fmt.Println()
 		fmt.Println("1) Register")
 		fmt.Println("2) Login")
 		fmt.Println("3) Exit")
 		fmt.Print("Pilih: ")
+
 		if !scanner.Scan() {
 			return
 		}
+
 		choice := strings.TrimSpace(scanner.Text())
+
 		switch choice {
 		case "1":
 			if err := handleRegister(scanner); err != nil {
@@ -82,18 +84,14 @@ func handleRegister(scanner *bufio.Scanner) error {
 		return errors.New("email sudah terdaftar")
 	}
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return err
-	}
-
 	newUser := User{
 		Email:       email,
 		PhoneNumber: phone,
-		Password:    string(hash),
+		Password:    password, // tidak hash
 	}
 
 	users = append(users, newUser)
+
 	if err := saveUsers(users); err != nil {
 		return err
 	}
@@ -125,7 +123,7 @@ func handleLogin(scanner *bufio.Scanner) error {
 		return errors.New("email tidak ditemukan")
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
+	if user.Password != password {
 		return errors.New("password salah")
 	}
 
@@ -138,7 +136,7 @@ func validateRegisterInput(email, phone, password string) error {
 		return errors.New("email tidak valid")
 	}
 	if !validPhone(phone) {
-		return errors.New("phone number tidak valid. Hanya angka, panjang 10-15 digit")
+		return errors.New("phone number tidak valid. Hanya angka. Panjang 10-15 digit")
 	}
 	if len(password) < 6 {
 		return errors.New("password minimal 6 karakter")
@@ -147,8 +145,6 @@ func validateRegisterInput(email, phone, password string) error {
 }
 
 func validEmail(email string) bool {
-	// pola sederhana: ada @ dan titik setelah @
-	// regex ini cukup untuk skenario tugas
 	re := regexp.MustCompile(`^[^@\s]+@[^@\s]+\.[^@\s]+$`)
 	return re.MatchString(email)
 }
@@ -170,10 +166,11 @@ func loadUsers() ([]User, error) {
 
 	var users []User
 	dec := json.NewDecoder(f)
+
 	if err := dec.Decode(&users); err != nil {
-		// jika file kosong atau rusak, kembalikan slice kosong
 		return []User{}, nil
 	}
+
 	return users, nil
 }
 
