@@ -31,7 +31,6 @@ func main() {
 		if !scanner.Scan() {
 			return
 		}
-
 		choice := strings.TrimSpace(scanner.Text())
 
 		switch choice {
@@ -52,26 +51,74 @@ func main() {
 	}
 }
 
+// Baca input satu baris dengan prompt
+func readLine(scanner *bufio.Scanner, prompt string) (string, error) {
+	fmt.Print(prompt)
+	if !scanner.Scan() {
+		return "", errors.New("input gagal")
+	}
+	return strings.TrimSpace(scanner.Text()), nil
+}
+
+// Minta email sampai valid format
+func promptEmail(scanner *bufio.Scanner) (string, error) {
+	for {
+		email, err := readLine(scanner, "Email: ")
+		if err != nil {
+			return "", err
+		}
+		if !validEmail(email) {
+			fmt.Println("Email tidak valid. Format harus ada @ dan domain.")
+			continue
+		}
+		return email, nil
+	}
+}
+
+// Minta phone sampai valid
+func promptPhone(scanner *bufio.Scanner) (string, error) {
+	for {
+		phone, err := readLine(scanner, "Phone number: ")
+		if err != nil {
+			return "", err
+		}
+		if !validPhone(phone) {
+			fmt.Println("Nomor tidak valid. Hanya angka. Panjang 10-15.")
+			continue
+		}
+		return phone, nil
+	}
+}
+
+// Minta password sampai valid
+func promptPassword(scanner *bufio.Scanner) (string, error) {
+	for {
+		pass, err := readLine(scanner, "Password: ")
+		if err != nil {
+			return "", err
+		}
+		if len(pass) < 6 {
+			fmt.Println("Password minimal 6 karakter.")
+			continue
+		}
+		return pass, nil
+	}
+}
+
 func handleRegister(scanner *bufio.Scanner) error {
-	fmt.Print("Email: ")
-	if !scanner.Scan() {
-		return errors.New("input gagal")
+	// Input dan validasi bertahap. Tidak kembali ke menu sampai valid.
+	email, err := promptEmail(scanner)
+	if err != nil {
+		return err
 	}
-	email := strings.TrimSpace(scanner.Text())
 
-	fmt.Print("Phone number: ")
-	if !scanner.Scan() {
-		return errors.New("input gagal")
+	phone, err := promptPhone(scanner)
+	if err != nil {
+		return err
 	}
-	phone := strings.TrimSpace(scanner.Text())
 
-	fmt.Print("Password: ")
-	if !scanner.Scan() {
-		return errors.New("input gagal")
-	}
-	password := strings.TrimSpace(scanner.Text())
-
-	if err := validateRegisterInput(email, phone, password); err != nil {
+	password, err := promptPassword(scanner)
+	if err != nil {
 		return err
 	}
 
@@ -87,7 +134,7 @@ func handleRegister(scanner *bufio.Scanner) error {
 	newUser := User{
 		Email:       email,
 		PhoneNumber: phone,
-		Password:    password,
+		Password:    password, // disimpan plain text sesuai permintaan
 	}
 
 	users = append(users, newUser)
@@ -101,47 +148,36 @@ func handleRegister(scanner *bufio.Scanner) error {
 }
 
 func handleLogin(scanner *bufio.Scanner) error {
-	fmt.Print("Email: ")
-	if !scanner.Scan() {
-		return errors.New("input gagal")
-	}
-	email := strings.TrimSpace(scanner.Text())
+	// Terus minta email + password sampai login berhasil.
+	for {
+		email, err := readLine(scanner, "Email: ")
+		if err != nil {
+			return err
+		}
+		password, err := readLine(scanner, "Password: ")
+		if err != nil {
+			return err
+		}
 
-	fmt.Print("Password: ")
-	if !scanner.Scan() {
-		return errors.New("input gagal")
-	}
-	password := strings.TrimSpace(scanner.Text())
+		users, err := loadUsers()
+		if err != nil {
+			return err
+		}
 
-	users, err := loadUsers()
-	if err != nil {
-		return err
-	}
+		user, found := findUserByEmail(users, email)
+		if !found {
+			fmt.Println("Email tidak ditemukan. Coba lagi.")
+			continue
+		}
 
-	user, found := findUserByEmail(users, email)
-	if !found {
-		return errors.New("email tidak ditemukan")
-	}
+		if user.Password != password {
+			fmt.Println("Password salah. Coba lagi.")
+			continue
+		}
 
-	if user.Password != password {
-		return errors.New("password salah")
+		fmt.Println("Login berhasil. Selamat datang", user.Email)
+		return nil
 	}
-
-	fmt.Println("Login berhasil. Selamat datang", user.Email)
-	return nil
-}
-
-func validateRegisterInput(email, phone, password string) error {
-	if !validEmail(email) {
-		return errors.New("email tidak valid")
-	}
-	if !validPhone(phone) {
-		return errors.New("phone number tidak valid. Hanya angka. Panjang 10-15 digit")
-	}
-	if len(password) < 6 {
-		return errors.New("password minimal 6 karakter")
-	}
-	return nil
 }
 
 func validEmail(email string) bool {
@@ -166,11 +202,10 @@ func loadUsers() ([]User, error) {
 
 	var users []User
 	dec := json.NewDecoder(f)
-
 	if err := dec.Decode(&users); err != nil {
+		// Jika file kosong atau rusak, kembalikan slice kosong
 		return []User{}, nil
 	}
-
 	return users, nil
 }
 
